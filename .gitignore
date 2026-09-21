@@ -1,0 +1,14 @@
+# Netlify 本地状态（站点绑定，不纳入仓库）
+/.netlify/
+
+# 发布目录为 deploy/，含站点三件套，会被提交；此处忽略内部素材与文档
+/docs/
+/.trae-html-share-packages/
+/attachments/
+
+# 临时与构建产物
+*.log
+_dbg.log
+_browser.txt
+Thumbs.db
+.DS_Store

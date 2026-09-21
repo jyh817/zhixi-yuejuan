@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智析阅卷 · 试卷分析系统</title>
+  <meta name="description" content="中小学试卷分析工具：逐题评价、整体评价、Excel 导出">
+  <link rel="stylesheet" href="style.css?v=20260921h">
+  <!-- 核心库 -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-text">
+        <span class="brand-title">智析阅卷</span>
+        <span class="brand-sub">试卷分析系统</span>
+      </div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-view="home">首页</button>
+      <button class="nav-item" data-view="oneclick">一键导入</button>
+      <button class="nav-item" data-view="templates">试题模板</button>
+      <button class="nav-item" data-view="exams">考试管理</button>
+      <button class="nav-item" data-view="analysis">成绩与分析</button>
+      <button class="nav-item" data-view="help">使用帮助</button>
+    </nav>
+    <div class="topbar-right">
+      <button class="ghost-btn" id="btnBackup">备份数据</button>
+      <button class="ghost-btn" id="btnRestore">恢复数据</button>
+      <button class="ghost-btn danger" id="btnClearAll">清除数据</button>
+      <input type="file" id="restoreFile" accept=".json" hidden>
+    </div>
+  </header>
+
+  <main id="app">
+
+    <!-- ============ 首页 ============ -->
+    <section class="view active" id="view-home">
+      <!-- 学校署名：独立条幅，与功能标题分开 -->
+      <div class="school-strip">
+        <span class="school-name">贵州省台江县民族中学</span>
+        <span class="school-divider"></span>
+        <span class="school-by">姜宇航 制</span>
+      </div>
+      <div class="hero">
+        <h1>智能试卷分析，一键生成评价报告</h1>
+        <p>上传试卷答案归档 · 录入学生小题成绩 · 自动逐题优劣势评价与整体评价 · 导出 Excel</p>
+      </div>
+      <div class="stat-grid" id="statGrid"></div>
+      <div class="quick-card">
+        <h3>快捷开始</h3>
+        <div class="quick-row">
+          <button class="primary" data-goto="oneclick">✨ 一键导入（推荐）</button>
+          <button class="ghost-btn" data-goto="templates">手动：试题模板</button>
+          <button class="ghost-btn" data-goto="exams">手动：考试管理</button>
+          <button class="ghost-btn" data-goto="analysis">手动：成绩与分析</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 一键导入（向导） ============ -->
+    <section class="view" id="view-oneclick">
+      <div class="view-head">
+        <h2>一键导入</h2>
+        <p class="hint">把试卷、答案、成绩 Excel 一次性拖进来，系统自动识别与导入，你核对修改后一键确认，系统自动完成审核并输出报告。</p>
+      </div>
+
+      <div class="stepper" id="impStepper">
+        <div class="step active" data-impstep="1"><span class="dot">1</span>上传文件</div>
+        <div class="step" data-impstep="2"><span class="dot">2</span>自动识别</div>
+        <div class="step" data-impstep="3"><span class="dot">3</span>核对修改</div>
+        <div class="step" data-impstep="4"><span class="dot">4</span>完成输出</div>
+      </div>
+
+      <!-- 步骤1：上传 -->
+      <div class="card import-step" data-imp="1">
+        <div class="form-grid">
+          <label>科目<select id="impSubject"></select></label>
+          <label>考试名称<input id="impName" placeholder="如：高二生物期中测试"></label>
+        </div>
+        <div class="dropzone" id="dropzone">
+          <div class="dz-icon">⤓</div>
+          <div class="dz-text">将 <b>试卷</b>、<b>答案</b>、<b>成绩Excel</b> 拖拽到此处（可一次拖多个）</div>
+          <div class="dz-sub">或点击此处选择文件 · 支持 PDF / Word(.docx) / .doc / Excel(.xlsx/.xls/.csv)</div>
+        </div>
+        <input type="file" id="impFiles" multiple hidden
+               accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+        <div id="impFileList" class="imp-files"></div>
+        <div class="modal-foot" style="padding:12px 0 0">
+          <span id="impStartHint" class="hint"></span>
+          <span style="flex:1"></span>
+          <button class="primary" id="btnImpStart" disabled>开始识别</button>
+        </div>
+      </div>
+
+      <!-- 步骤2：识别中 -->
+      <div class="card import-step hidden" data-imp="2">
+        <div id="impProgress">…</div>
+        <div id="impSummary" class="hint" style="margin-top:12px"></div>
+        <div class="modal-foot" style="padding:14px 0 0">
+          <button class="ghost-btn" id="btnImpBack1">上一步</button>
+          <span style="flex:1"></span>
+          <button class="primary" id="btnImpGotoReview">下一步：核对修改</button>
+        </div>
+      </div>
+
+      <!-- 步骤3：核对 -->
+      <div class="card import-step hidden" data-imp="3">
+        <div class="section-title">① 题目清单（可增删/改）<button class="mini-btn" id="btnImpAddQ">＋ 添加题目</button></div>
+        <div class="bulk-bar">
+          <span class="hint">批量补分值：</span>
+          <input type="number" id="impBulkVal" min="0" step="any" placeholder="分值" class="cell" style="width:80px">
+          <select id="impBulkType" class="cell" style="width:150px"></select>
+          <button class="mini-btn" id="btnImpBulkMark">应用</button>
+          <span class="hint">可对某个题型统一补分，留空的题一键补齐</span>
+        </div>
+        <div class="table-scroll" style="max-height:40vh">
+          <table id="impQTable"></table>
+        </div>
+        <div class="section-title">② 学生小题成绩（可改）<button class="mini-btn" id="btnImpAddStu">＋ 添加学生</button></div>
+        <div class="table-scroll" style="max-height:40vh">
+          <table id="impScoreTable"></table>
+        </div>
+        <div class="section-title">③ 归档预览
+          <button class="mini-btn" id="btnImpPaper">预览试卷</button>
+          <button class="mini-btn" id="btnImpAnswer">预览答案（含分值标注）</button>
+        </div>
+        <div class="modal-foot" style="padding:14px 0 0">
+          <button class="ghost-btn" id="btnImpBack2">上一步</button>
+          <span style="flex:1"></span>
+          <button class="primary" id="btnImpConfirm">确认无误，自动审核并输出</button>
+        </div>
+      </div>
+
+      <!-- 步骤4：完成 -->
+      <div class="card import-step hidden" data-imp="4">
+        <div class="success-banner">✓ 审核完成</div>
+        <div id="impResult"></div>
+        <div class="result-nav" style="margin-top:16px">
+          <button class="primary" id="btnImpExpClass">导出班级整体分析.xlsx</button>
+          <button class="primary" id="btnImpExpStu">导出学生个人评价报告.xlsx</button>
+        </div>
+        <div class="modal-foot" style="padding:16px 0 0">
+          <span style="flex:1"></span>
+          <button class="primary" id="btnImpAnother">再来一场考试</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 试题模板 ============ -->
+    <section class="view" id="view-templates">
+      <div class="view-head">
+        <h2>试题模板</h2>
+        <p class="hint">方式一：手动逐题录入；推荐用「智能识别导入」：上传试卷(及可选答案)PDF/Word，系统自动提取各题号、分值、题型生成草稿，你再快速核对保存。</p>
+        <div class="head-actions">
+          <button class="ghost-btn" id="btnSmart">✨ 智能识别导入</button>
+          <button class="primary" id="btnNewTemplate">＋ 新建模板</button>
+        </div>
+      </div>
+      <div id="templateList" class="card-grid"></div>
+
+      <!-- 智能识别弹窗 -->
+      <div class="modal hidden" id="smartModal">
+        <div class="modal-card">
+          <div class="modal-head">
+            <h3>智能识别试卷 → 生成试题模板</h3>
+            <button class="icon-btn close" data-close="smartModal">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-grid">
+              <label>科目<select id="smartSubject"></select></label>
+              <label>建议模板名<input id="smartName" placeholder="如：2026春高三数学二轮"></label>
+            </div>
+            <div class="form-grid">
+              <div class="upload-box">
+                <span class="upload-label">上传试卷（推荐，识别题号与分值）</span>
+                <input type="file" id="smartPaper" accept=".pdf,.docx,.doc">
+                <div class="file-meta" id="smartPaperMeta">支持文字版 PDF / Word(.docx)；扫描版 PDF 将自动启用 OCR（较慢）</div>
+              </div>
+              <div class="upload-box">
+                <span class="upload-label">上传参考答案（可选，辅助校准分值）</span>
+                <input type="file" id="smartAnswer" accept=".pdf,.docx,.doc">
+                <div class="file-meta" id="smartAnswerMeta">可选</div>
+              </div>
+            </div>
+            <div class="upload-box" style="margin-bottom:14px">
+              <button class="primary" id="btnSmartRun" disabled>开始识别</button>
+              <div id="smartProgress" class="hint hidden" style="margin-top:10px"></div>
+            </div>
+            <div id="smartSummary" class="hint"></div>
+            <div class="modal-foot" style="margin-top:12px">
+              <button class="ghost-btn" data-close="smartModal">取消</button>
+              <button class="primary" id="btnSmartToTpl" disabled>用识别结果生成模板并核对</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 模板编辑弹窗 -->
+      <div class="modal hidden" id="tplModal">
+        <div class="modal-card wide">
+          <div class="modal-head">
+            <h3 id="tplModalTitle">新建试题模板</h3>
+            <button class="icon-btn close" data-close="tplModal">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-grid">
+              <label>模板名称<input id="tplName" placeholder="如：2026春高三月考"></label>
+              <label>科目
+                <select id="tplSubject"></select>
+              </label>
+            </div>
+            <div class="section-title">题目清单 <button class="mini-btn" id="btnAddQ">＋ 添加题目</button>
+              <button class="mini-btn" id="btnQuickFill">快速填充</button>
+            </div>
+            <div class="table-scroll">
+              <table id="qTable">
+                <thead>
+                  <tr>
+                    <th style="width:70px">题号</th>
+                    <th style="width:150px">题型</th>
+                    <th>考点/知识点</th>
+                    <th style="width:100px">分值</th>
+                    <th style="width:60px"></th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="modal-foot">
+              <button class="ghost-btn" data-close="tplModal">取消</button>
+              <button class="primary" id="btnSaveTpl">保存模板</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 考试管理 ============ -->
+    <section class="view" id="view-exams">
+      <div class="view-head">
+        <h2>考试管理</h2>
+        <p class="hint">创建考试，选择科目与模板，归档上传试卷与答案（PDF / Word，仅作在线预览与备份）。</p>
+        <div class="head-actions">
+          <button class="primary" id="btnNewExam">＋ 创建考试</button>
+        </div>
+      </div>
+      <div id="examList" class="card-grid"></div>
+
+      <!-- 考试编辑弹窗 -->
+      <div class="modal hidden" id="examModal">
+        <div class="modal-card wide">
+          <div class="modal-head">
+            <h3 id="examModalTitle">创建考试</h3>
+            <button class="icon-btn close" data-close="examModal">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-grid">
+              <label>考试名称<input id="examName" placeholder="如：市一模数学"></label>
+              <label>科目<select id="examSubject"></select></label>
+              <label>试题模板<select id="examTemplate"></select></label>
+              <label>考试日期<input type="date" id="examDate"></label>
+            </div>
+            <div class="form-grid">
+              <div class="upload-box">
+                <span class="upload-label">上传试卷电子版（可选）</span>
+                <input type="file" id="paperFile" accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword">
+                <div class="file-meta" id="paperMeta"></div>
+              </div>
+              <div class="upload-box">
+                <span class="upload-label">上传参考答案（可选）</span>
+                <input type="file" id="answerFile" accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword">
+                <div class="file-meta" id="answerMeta"></div>
+              </div>
+            </div>
+            <div class="modal-foot">
+              <button class="ghost-btn" data-close="examModal">取消</button>
+              <button class="primary" id="btnSaveExam">保存考试</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 归档预览弹窗 -->
+      <div class="modal hidden" id="archiveModal">
+        <div class="modal-card wide tall">
+          <div class="modal-head">
+            <h3 id="archiveTitle">文件预览</h3>
+            <button class="icon-btn close" data-close="archiveModal">✕</button>
+          </div>
+          <div class="modal-body preview-body" id="archiveBody"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 成绩与分析 ============ -->
+    <section class="view" id="view-analysis">
+      <div class="view-head">
+        <h2>成绩与报告</h2>
+        <p class="hint">选择考试 → 导入或录入学生小题成绩 → 点击生成分析。可导出班级整体分析与学生个人评价报告。</p>
+      </div>
+
+      <div class="analysis-bar card">
+        <select id="anaExam"><option value="">—— 请选择题号模板对应的考试 ——</option></select>
+        <span class="bar-label">当前学生数：<b id="anaCount">0</b></span>
+        <span class="bar-spacer"></span>
+        <button class="primary" id="btnImportXlsx">导入成绩 Excel</button>
+        <button class="ghost-btn" id="btnDownloadTpl">下载录入模板</button>
+        <button class="ghost-btn danger-btn" id="btnClearScores">清空本场成绩</button>
+        <input type="file" id="xlsxFile" accept=".xlsx,.xls,.csv" hidden>
+      </div>
+
+      <div class="report-grid">
+        <div class="card" id="scoreCard">
+          <div class="card-head">
+            <h3>学生小题成绩录入</h3>
+            <span class="mini-btn" id="btnAddStudent">＋ 添加学生</span>
+          </div>
+          <p class="hint empty-hint" id="scoreHint">请先在上方选择一场考试，再导入或填写成绩。</p>
+          <div class="table-scroll" id="scoreWrap" style="display:none">
+            <table id="scoreTable"></table>
+          </div>
+        </div>
+
+        <div class="card" id="resultCard">
+          <div class="card-head">
+            <h3>分析报告</h3>
+            <button class="primary" id="btnAnalyze" disabled>生成分析报告</button>
+          </div>
+          <p class="hint empty-hint" id="anaHint">选择考试并录入成绩后，点击"生成分析报告"。</p>
+          <div class="analysis-result hidden" id="anaResult">
+            <div class="result-nav">
+              <button class="primary" id="btnExportClass">导出班级整体分析.xlsx</button>
+              <button class="primary" id="btnExportStudents">导出学生个人评价报告.xlsx</button>
+            </div>
+            <div class="class-summary" id="classSummary"></div>
+            <div class="section-title">逐题统计</div>
+            <div class="table-scroll"><table id="qStatTable"></table></div>
+            <div class="section-title">学生整体一览</div>
+            <div class="table-scroll"><table id="stuOverviewTable"></table></div>
+            <div class="section-title">逐题评价示例（点击学生查看）</div>
+            <div id="stuDetail"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 使用帮助 ============ -->
+    <section class="view" id="view-help">
+      <h2>使用帮助</h2>
+      <ol class="help-list">
+        <li><b>创建试题模板</b>：推荐用「智能识别导入」上传试卷（及可选答案）PDF/Word，系统自动识别出题号、分值、题型，快速核对后保存；也可手动逐题录入。一次建好可复用于多场考试。</li>
+        <li><b>创建考试</b>：选择科目与模板，填写考试名称和日期，上传试卷/答案 PDF 或 Word 作为归档（可在系统内在线预览）。</li>
+        <li><b>导入成绩</b>：从阅卷系统导出的 Excel（每行一个学生、每列一个小题得分），或使用系统下载的录入模板填写后导入；也可直接在线录入。</li>
+        <li><b>生成报告</b>：点击"生成分析报告"，系统按规则引擎自动完成逐题评价与整体评价。</li>
+        <li><b>导出下载</b>：导出《班级整体分析.xlsx》或《学生个人评价报告.xlsx》供老师、学生使用。</li>
+        <li><b>数据备份</b>：数据保存在本地浏览器。建议定期在右上角"备份数据"导出 JSON 存档，换设备时"恢复数据"导入。</li>
+        <li><b>上线发布</b>：本系统为纯前端应用，可部署到任意静态托管平台（Netlify / Vercel / GitHub Pages），几分钟即可获得可分享给师生的公网链接。详见部署指引。</li>
+      </ol>
+    </section>
+
+  </main>
+
+  <div class="toast-wrap" id="toastWrap"></div>
+
+  <script src="app.js?v=20260921h"></script>
+</body>
+</html>
