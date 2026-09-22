@@ -3,7 +3,7 @@
 'use strict';
 
 /* 构建版本：前端展示用，便于判断是否缓存了旧脚本 */
-const APP_VERSION = '20260922g';
+const APP_VERSION = '20260922h';
 
 /* ---------- 科目字典 ---------- */
 const SUBJECTS = [
@@ -1854,6 +1854,14 @@ async function wizParse() {
       q.sort = i + 1;
     });
     WIZ.questions = qList;
+    // 诊断信息：记录试卷/答案提取情况与题目来源，供核对页面展示
+    WIZ._diag = {
+      paperChars: paperText.replace(/\s/g, '').length,
+      ansChars: (WIZ.answerText || '').replace(/\s/g, '').length,
+      hasPaper: !!WIZ.paperFile, hasAnswer: !!WIZ.answerFile,
+      source: qList.length ? '试卷解析' : (paperText.replace(/\s/g, '').length ? '试卷解析(0题)' : ''),
+      qCount: qList.length, ver: APP_VERSION,
+    };
     // 自动按题目文字标注知识点
     autoKnowledge(WIZ.questions, $('#impSubject').value || WIZ._subjectId || SUBJECTS[0].id);
     // 4. 成绩 Excel 导入
@@ -1919,6 +1927,7 @@ function wizImportScores(wb) {
   const use = best.res;
   // 无试卷/答案题目时，用成绩表表头自动推断出的小题
   if (use.auto && use.qList && use.qList.length) {
+    WIZ._diag = Object.assign({}, WIZ._diag, { source: '成绩Excel表头自动生成（试卷未提取到文字）', qCount: use.qList.length });
     WIZ.questions = use.qList.map((q, i) => ({
       qid: q.qid || ('Q' + (i + 1)), type: q.type || '未分类',
       knowledge: q.knowledge || '综合', fullMark: q.fullMark || 0, sort: i + 1,
@@ -2040,6 +2049,17 @@ function importScoreSheet(ws) {
 
 /* --- 核对页渲染 --- */
 function renderWizReview() {
+  // 诊断横幅：版本号 + 试卷/答案文字提取情况 + 题目来源，一眼定位是否缓存旧版或提取失败
+  const dg = $('#impDiag');
+  if (dg) {
+    const d = WIZ._diag || {};
+    const srcBad = d.source && /未提取到|表头自动生成|0题/.test(d.source);
+    dg.innerHTML =
+      `<span class="diag-item">版本 <b>${esc(d.ver || APP_VERSION || '-')}</b></span>` +
+      `<span class="diag-item">试卷文件 ${d.hasPaper ? '✅' : '❌未传'} 提取 <b>${d.paperChars ?? '-'}</b> 字</span>` +
+      `<span class="diag-item">答案文件 ${d.hasAnswer ? '✅' : '❌未传'} 提取 <b>${d.ansChars ?? '-'}</b> 字</span>` +
+      `<span class="diag-item">题目来源：<b class="${srcBad ? 'warn' : ''}">${esc(d.source || '未知')}</b>（${d.qCount ?? 0} 题）</span>`;
+  }
   // ① 题目清单
   const qt = $('#impQTable');
   qt.innerHTML = '<thead><tr><th style="width:90px">题号</th><th style="width:110px">题型</th><th>知识点</th><th style="width:90px">分值</th><th style="width:44px"></th></tr></thead><tbody>';

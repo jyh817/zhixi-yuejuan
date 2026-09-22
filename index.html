@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>智析阅卷 · 试卷分析系统</title>
   <meta name="description" content="中小学试卷分析工具：逐题评价、整体评价、Excel 导出">
-  <link rel="stylesheet" href="style.css?v=20260922a">
+  <link rel="stylesheet" href="style.css?v=20260922h">
   <!-- 核心库 -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -109,6 +109,7 @@
 
       <!-- 步骤3：核对 -->
       <div class="card import-step hidden" data-imp="3">
+        <div class="diagbar" id="impDiag"></div>
         <div class="section-title">① 题目清单（可增删/改）<button class="mini-btn" id="btnImpAddQ">＋ 添加题目</button></div>
         <div class="bulk-bar">
           <span class="hint">批量补分值：</span>
@@ -368,6 +369,6 @@
 
   <div class="toast-wrap" id="toastWrap"></div>
 
-  <script src="app.js?v=20260922g"></script>
+  <script src="app.js?v=20260922h"></script>
 </body>
 </html>

@@ -186,6 +186,10 @@ input.cell{width:64px;padding:4px 6px;text-align:center}
 .dz-icon{font-size:34px;color:var(--primary);line-height:1}
 .dz-text{font-size:15px;margin:8px 0 4px}
 .dz-sub{color:var(--muted);font-size:12px}
+.diagbar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;background:var(--panel,#fff);border:1px solid #eee;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12.5px;color:var(--text,#333)}
+.diag-item{white-space:nowrap}
+.diag-item b{font-weight:600}
+.diag-item b.warn{color:#c0392b}
 .imp-files{display:grid;gap:8px;margin-top:12px}
 .imp-file{display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px solid var(--line);
   border-radius:10px;padding:8px 12px}
