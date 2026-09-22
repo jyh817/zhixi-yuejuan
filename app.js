@@ -1600,19 +1600,19 @@ function detectPoints(text) {
   // 1) 明确单题分值
   let m = stem.match(/(?:本题|该题|本小问)\s*(?:满分)?\s*(\d+(?:\.\d+)?)\s*分/);
   if (m) return parseFloat(m[1]);
-  // 2) 括号分值，剔除汇总类
-  const marks = [...stem.matchAll(/[（(]\s*(\d+(?:\.\d+)?)\s*分\s*[）)]/g)]
-    .map(o => ({ v: parseFloat(o[1]), i: o.index }));
-  const clean = marks.filter(o => {
-    const pre = stem.slice(Math.max(0, o.i - 6), o.i);
-    return !/(共|合计|总计|组内|本组|该组|总分|每题|每空|每点)$/.test(pre);
-  });
-  if (clean.length) return clean[0].v;
-  // 3) 唯一的"X分"（非 共/每 前缀）
+  // 2) 括号分值，剔除汇总类（"（本题共5小题，19分）""（共19分）"等大题总分不作单题分）
+  const clean = [];
+  for (const o of stem.matchAll(/[（(]([^（）()]*?)(\d+(?:\.\d+)?)\s*分\s*[）)]/g)) {
+    const pre = o[1] || '';                       // 括号内、分值数字前的整段文字
+    if (/(共|合计|总计|组内|本组|该组|总分|小题|每题|每空|每点)/.test(pre)) continue;
+    clean.push(parseFloat(o[2]));
+  }
+  if (clean.length) return clean[0];
+  // 3) 唯一的"X分"（其前是 共/合计/总计/总分/小题 等汇总口径则不取，避免把大题总分当单题分）
   const all = [...stem.matchAll(/(\d+(?:\.\d+)?)\s*分/g)];
   if (all.length === 1) {
-    const pre = stem.slice(Math.max(0, all[0].index - 2), all[0].index);
-    if (!/(共|每)$/.test(pre)) return parseFloat(all[0][1]);
+    const pre = stem.slice(Math.max(0, all[0].index - 8), all[0].index);
+    if (!/(共|合计|总计|总分|小题|本组|该组|每题|每空|每点)/.test(pre)) return parseFloat(all[0][1]);
   }
   return 0;
 }
