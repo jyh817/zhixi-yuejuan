@@ -1830,13 +1830,30 @@ async function wizParse() {
 }
 
 function wizImportScores(wb) {
-  const ws = wb.Sheets[wb.SheetNames[0]];
+  // 成绩表可能按科目分多个 sheet：优先选择与当前考试科目同名的 sheet，
+  // 科目未选或对不上时，按 sheet 顺序依次尝试，取第一个能识别出学生的
+  const subjName = (() => {
+    const id = WIZ._subjectId || (($('#impSubject')) && $('#impSubject').value);
+    const s = SUBJECTS.find(x => x.id === id);
+    return s ? s.name : '';
+  })();
+  const all = wb.SheetNames || [];
+  const ordered = subjName
+    ? [...all.filter(sn => sn.includes(subjName)), ...all.filter(sn => !sn.includes(subjName))]
+    : all;
+  for (const sn of ordered) {
+    const res = importScoreSheet(wb.Sheets[sn]);
+    if (res && res.count > 0) { WIZ.students = res.students; return res.count; }
+  }
+  return 0;
+}
+function importScoreSheet(ws) {
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-  if (rows.length < 2) return 0;
+  if (rows.length < 2) return { students: [], count: 0 };
   const lastNum = (s) => { const m = String(s).match(/(\d+)/g); return m ? +m[m.length - 1] : null; };
   // 定位"姓名/学生"标识所在表头行（多级合并表头以此为基准）
   const nameRi = rows.findIndex(r => r.some(c => /姓名|学生|name/i.test(String(c))));
-  if (nameRi < 0) return 0;
+  if (nameRi < 0) return { students: [], count: 0 };
   const nameCol = rows[nameRi].findIndex(c => /姓名|学生|name/i.test(String(c)));
   // 表头可能有多层（如 语文→客观题→单选1 三层合并、标题行/二维码行等），
   // 数据起始行 = 姓名所在列首次出现真实内容的那一行
@@ -1849,7 +1866,6 @@ function wizImportScores(wb) {
   if (dataStart >= rows.length) dataStart = nameRi + 1;
   // 把 姓名行 到 数据行 之前的每一层表头合成一行：自下而上取每列【最后一个非空】表头，
   // 这样下层的"单选1"能覆盖上层的"客观题/语文"，多层合并表头也能逐列正确归一到最具体的小题名
-  const headerRange = dataStart - nameRi;
   const ncol = Math.max(...rows.slice(nameRi, dataStart).map(r => (r ? r.length : 0)));
   const headers = [];
   for (let c = 0; c < ncol; c++) {
@@ -1862,6 +1878,7 @@ function wizImportScores(wb) {
   }
   const nameIdx = headers.findIndex(h => /姓名|学生|name/i.test(h));
   const noIdx = headers.findIndex(h => /(学号|考号|\bid\b)/i.test(h) && !/姓名/.test(h));
+  if (nameIdx < 0) return { students: [], count: 0 };
   const minIdx = Math.max(nameIdx, noIdx) + 1; // 小题列从学生标识列之后开始找
   // 题目 → Excel 列：按题号末尾数字匹配（"单选1" ↔ 题1，"Q3" ↔ 题3）
   const qHeadIdx = WIZ.questions.map(q => {
@@ -1878,8 +1895,8 @@ function wizImportScores(wb) {
       for (let k = 0; k < WIZ.questions.length; k++) if (qHeadIdx[k] < 0) qHeadIdx[k] = numCols[k];
     }
   }
-  if (qHeadIdx.every(i => i < 0)) return 0;
-  WIZ.students = [];
+  if (qHeadIdx.every(i => i < 0)) return { students: [], count: 0 };
+  const students = [];
   for (let r = dataStart; r < rows.length; r++) {
     const row = rows[r];
     if (!row) continue;
@@ -1892,9 +1909,9 @@ function wizImportScores(wb) {
       const v = idx >= 0 ? row[idx] : 0;
       scores[q.qid] = v === '' || v == null ? 0 : Math.max(0, toNum(v) || 0);
     });
-    WIZ.students.push({ id: uid(), name: name || '学生' + (r + 1), no, scores });
+    students.push({ id: uid(), name: name || '学生' + (r + 1), no, scores });
   }
-  return WIZ.students.length;
+  return { students, count: students.length };
 }
 
 /* --- 核对页渲染 --- */
