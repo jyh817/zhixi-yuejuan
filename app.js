@@ -3,7 +3,7 @@
 'use strict';
 
 /* 构建版本：前端展示用，便于判断是否缓存了旧脚本 */
-const APP_VERSION = '20260922h';
+const APP_VERSION = '20260922i';
 
 /* ---------- 科目字典 ---------- */
 const SUBJECTS = [
@@ -1184,20 +1184,34 @@ async function extractText(file) {
   const name = (file.name || '').toLowerCase();
   const buf = await file.arrayBuffer();
   if (name.endsWith('.docx') || /wordprocessing/.test(file.type)) {
-    let txt = '';
-    let html = '';
+    // 优先内置 ZIP 解析：保证段落内留换行、题号可被规则识别，且不依赖外部 CDN。
+    // （此前依赖 mammoth 的 innerText，会把段落挤成单行导致 parsePaper 识别不到任何题目）
+    if (typeof DecompressionStream !== 'undefined') {
+      try {
+        const xml = await extractDocxXml(buf);
+        if (xml) {
+          const t = textFromWml(xml);
+          if (t.replace(/\s/g, '').length) return t;
+        }
+      } catch (e) { /* 继续走兜底 */ }
+    }
     if (typeof mammoth !== 'undefined') {
-      try { const res = await mammoth.convertToHtml({ arrayBuffer: buf }); html = (res && res.value) || ''; } catch (e) { html = ''; }
+      try {
+        const res = await mammoth.convertToHtml({ arrayBuffer: buf });
+        const html = (res && res.value) || '';
+        if (html) {
+          // 确定性转换：块级/表格/换行标签→换行，而不是读 innerText。
+          // innerText 在不同浏览器下会把整份试卷压成单行，导致 parsePaper 识别不到任何题号。
+          const t = html.replace(/<\/(p|div|h[1-6]|li|td|tr|table|figure|figcaption)>/gi, '\n')
+            .replace(/<br[^>]*>/gi, '\n')
+            .replace(/<[^>]+>/g, '')
+            .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+            .replace(/\u00a0/g, ' ').replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n');
+          if (t.replace(/\s/g, '').length) return t;
+        }
+      } catch (e) { /* 继续走兜底 */ }
     }
-    if (html && typeof document !== 'undefined') {
-      const d = document.createElement('div'); d.innerHTML = html;
-      txt = (d.innerText || d.textContent || '').replace(/\u00a0/g, ' ');
-    }
-    // mammoth 缺失或提取为空 → 用内置 ZIP 解析兜底（不依赖外部网络）
-    if (!txt.replace(/\s/g, '').length && typeof DecompressionStream !== 'undefined') {
-      try { const xml = await extractDocxXml(buf); if (xml) txt = textFromWml(xml); } catch (e) { /* 保持原样 */ }
-    }
-    return txt || html;
+    throw new Error('.docx 文字提取失败，请尝试另存为 PDF 后再识别');
   }
   if (name.endsWith('.doc') || /msword/.test(file.type)) {
     const s = decodeDocText(new Uint8Array(buf));
