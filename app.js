@@ -3,7 +3,7 @@
 'use strict';
 
 /* 构建版本：前端展示用，便于判断是否缓存了旧脚本 */
-const APP_VERSION = '20260922i';
+const APP_VERSION = '20260922j';
 
 /* ---------- 科目字典 ---------- */
 const SUBJECTS = [
@@ -1452,6 +1452,54 @@ const KNOWLEDGE_MAP = {
     { name: '文化生活', kws: ['文化', '民族精神', '传统文化', '核心价值观', '中华文化', '文化创新', '继承'] },
   ],
 };
+/* 细粒度知识点：在板块（如现代文阅读）内部再区分具体知识点。
+   板块头只负责收敛到大类；细分靠题目本身特征词，命中不够确定时退回大类，
+   避免在不确定时给出一个可能错得很具体的标签。 */
+const KNOWLEDGE_FINE = {
+  chinese: {
+    '现代文阅读': [
+      { name: '信息筛选与整合', kws: ['根据材料内容', '正确的一项是', '不正确的一项是', '说法正确的是', '说法不正确', '下列选项', '下列表述', '理解和分析', '不属于', '相关内容', '对材料的', '可以体现', '印证', '推断', '对文章'] },
+      { name: '论证与分析', kws: ['论证', '论点', '论据', '论证方法', '论证结构', '论证思路', '层层递进', '承上启下', '段落论证'] },
+      { name: '行文思路', kws: ['行文思路', '梳理', '概括', '简述', '要点', '层次', '脉络', '顺序', '结构安排', '整体结构', '思路'] },
+      { name: '词语理解', kws: ['加点词语', '词语的含义', '理解文中加点', '这个词', '词语在文中', '指什么', '含义是什么'] },
+      { name: '语句赏析', kws: ['赏析', '品味', '妙处', '精妙之处', '这句话', '画线句', '句子', '表达效果', '富有表现力', '描写有何', '好在', '好处'] },
+      { name: '标题作用', kws: ['标题', '题目的', '以……为题', '可否换成', '为什么以', '标题作用', '能否', '换'] },
+      { name: '人物形象', kws: ['人物形象', '塑造了', '性格', '心理', '品质', '形象特点', '刻画', '主人公', '写出人物', '人物描写'] },
+      { name: '作用与效果', kws: ['作用', '效果', '铺垫', '照应', '呼应', '伏笔', '引出下文', '开头段', '结尾段', '安排', '在文中'] },
+      { name: '表现手法', kws: ['表现手法', '修辞', '象征', '对比', '衬托', '反衬', '虚实', '反复', '排比', '设问', '比喻', '拟人', '白描'] },
+      { name: '主旨与探究', kws: ['主旨', '主题', '探究', '启示', '感悟', '谈理解', '联系全文', '结合全文', '情感', '作者意图'] },
+    ],
+    '文言文阅读': [
+      { name: '文言实词', kws: ['加点词', '实词', '词义', '解释相同', '加点词语', '词的解释', '不正确的一项', '加点的词'] },
+      { name: '文言虚词', kws: ['虚词', '意义和用法', '加点虚词', '区别', '不同的用法'] },
+      { name: '文言断句', kws: ['断句', '画波浪线', '划分句子', '标出', '节奏'] },
+      { name: '文言翻译', kws: ['翻译', '成现代汉语', '译成', '译文', '翻译句子', '翻译文中'] },
+      { name: '内容理解与概括', kws: ['概括', '理解', '简要', '内容', '措施', '原因', '哪些', '为什么', '下列说法', '下列关于原文', '解说', '具体措施'] },
+      { name: '词类活用与句式', kws: ['词类活用', '古今异义', '通假', '文言句式', '省略', '被动', '判断句', '活用'] },
+    ],
+    '古诗词鉴赏': [
+      { name: '诗歌炼字', kws: ['炼字', '哪个字', '用得最妙', '字眼', '点睛', '一字', '动词', '用得好'] },
+      { name: '诗歌情感', kws: ['情感', '思想感情', '抒发', '表达的情感', '怎样的感情', '内心', '愁', '主题'] },
+      { name: '诗歌手法', kws: ['手法', '借景抒情', '虚实', '衬托', '用典', '象征', '白描', '烘托', '渲染', '动静', '对比'] },
+      { name: '诗歌形象', kws: ['形象', '意象', '画面', '景象', '意境', '描绘', '景物'] },
+      { name: '诗歌语言', kws: ['语言风格', '语言', '诗眼', '用词', '含蓄', '洗练', '沉郁', '豪放'] },
+    ],
+    '名句默写': [
+      { name: '名篇名句默写', kws: ['补写出', '空缺部分', '默写', '句子', '填空'] },
+    ],
+    '语言文字运用': [
+      { name: '词语运用', kws: ['词语', '成语', '填入', '括号内', '恰当的一项', '使用正确', '运用恰', '具体语境', '词语使用'] },
+      { name: '病句修改', kws: ['病句', '表达不当', '修改', '有语病', '序号', '准确流畅', '简明'] },
+      { name: '句序与衔接', kws: ['衔接', '连贯', '语序', '排列', '顺序', '复位', '插入'] },
+      { name: '语言表达得体', kws: ['得体', '应用文', '邀请', '通知', '启事', '称谓', '口语', '书面语', '委婉'] },
+      { name: '句式仿写与概括', kws: ['仿写', '仿照', '小标题', '拟写', '缩写', '压缩', '下定义', '概括', '转述', '改写'] },
+      { name: '图文转换', kws: ['图表', '徽标', '漫画', '图片', '思维导图', '示意'] },
+    ],
+    '作文': [
+      { name: '材料作文·立意', kws: ['阅读下面的材料', '写作', '谈谈', '认识', '感悟', '根据要求', '自拟题目', '议论文'] },
+    ],
+  },
+};
 const normK = (s = '') => String(s).toLowerCase().replace(/[\s（）()：:，,。.、;；'"“”!！?？\-—]/g, '');
 /* 依据题目文字自动标注知识点。
    打分规则：
@@ -1461,40 +1509,54 @@ const normK = (s = '') => String(s).toLowerCase().replace(/[\s（）()：:，,�
    - 仅命中 1 个关键词时打折，且需达到置信阈值，不足则归为「综合」，减少错标。 */
 function autoKnowledge(questions, subjectId) {
   const list = KNOWLEDGE_MAP[subjectId] || [];
-  const normed = list.map(kp => ({ kp, kws: (kp.kws || []).map(normK).filter(k => k.length >= 2) }));
-  const names = new Set(normed.map(({ kp }) => kp.name));
+  const fineAll = KNOWLEDGE_FINE[subjectId] || {};
+  const normed = list.map(kp => ({ name: kp.name, kws: (kp.kws || []).map(normK).filter(k => k.length >= 2) }));
+  const names = new Set(normed.map(x => x.name));
   const kwFreq = {};
   for (const { kws } of normed) for (const k of kws) kwFreq[k] = (kwFreq[k] || 0) + 1;
+  const fineNormed = {};
+  for (const sec in fineAll) fineNormed[sec] = fineAll[sec].map(kp => ({ name: kp.name, kws: (kp.kws || []).map(normK).filter(k => k.length >= 2) }));
+
+  // 对一组知识点打分（板块级与细粒度共用），返回 {best, bs}
+  const scoreEntries = (partsT, matT, kwsList) => {
+    let best = '', bs = 0;
+    for (const { name, kws } of kwsList) {
+      const cell = [];
+      for (const k of kws) { const inParts = partsT.includes(k); if (inParts || matT.includes(k)) cell.push({ k, inParts }); }
+      if (!cell.length) continue;
+      const maximal = cell.filter((c, i) => !cell.some((d, j) => j !== i && d.k.length > c.k.length && d.k.includes(c.k)));
+      let sc = 0;
+      for (const { k, inParts } of maximal) sc += Math.min(k.length, 5) * (kwFreq[k] > 1 ? 0.5 : 1) * (inParts ? 1 : 0.6);
+      const finalScore = sc * (maximal.length >= 2 ? 1 : 0.55);
+      if (finalScore > bs) { bs = finalScore; best = name; }
+    }
+    return { best, bs };
+  };
 
   (questions || []).forEach(q => {
     const partsT = normK((q.parts || []).join(' '));
-    const matT   = normK(q.material || '');
-    let best = '综合', bestScore = 0;
-    for (const { kp, kws } of normed) {
-      // 逐词判断命中及来源（题干优先，仅材料命中降权）
-      const cell = [];    // { k, inParts }
-      for (const k of kws) {
-        const inParts = partsT.includes(k);
-        if (inParts || matT.includes(k)) cell.push({ k, inParts });
-      }
-      if (!cell.length) continue;
-      // 同类内去除子串冗余：如「加速度」与「速度」同中时，短词重复计分会虚高
-      const maximal = cell.filter((c, i) =>
-        !cell.some((d, j) => j !== i && d.k.length > c.k.length && d.k.includes(c.k)));
-      let score = 0;
-      for (const { k, inParts } of maximal) {
-        score += Math.min(k.length, 5) * (kwFreq[k] > 1 ? 0.5 : 1) * (inParts ? 1 : 0.6);
-      }
-      const finalScore = score * (maximal.length >= 2 ? 1 : 0.55);
-      if (finalScore > bestScore) { bestScore = finalScore; best = kp.name; }
+    const matT = normK(q.material || '');
+    // 1) 先定大类（板块），沿用「板块头优先 + 关键词修正 + 不强标」的既有逻辑
+    const coarse = scoreEntries(partsT, matT, normed);
+    const isCombined = coarse.bs >= 1.5;
+    const hasHint = q._knowHint && names.has(q._knowHint);
+    const contentFix = isCombined && (coarse.best === '名句默写' || coarse.best === '作文') && coarse.bs >= 2.0 && coarse.best !== q._knowHint;
+    let bucket;
+    if (hasHint && !contentFix) bucket = q._knowHint;
+    else if (isCombined) bucket = coarse.best;
+    else bucket = '综合';
+
+    // 2) 板块内再细化到具体知识点；命中不够确定就退回大类，避免错得离谱
+    let label = bucket;
+    const fineKws = fineNormed[bucket] || [];
+    let fineBs = 0;
+    if (fineKws.length) {
+      const f = scoreEntries(partsT, matT, fineKws);
+      fineBs = f.bs;
+      if (f.bs >= 1.0 && f.best && f.best !== bucket) label = f.best;
     }
-    const isCombined = bestScore >= 1.5;
-    // 关键词命中不足时，若该题从属于板块头明确的大题（如文言文/默写/写作），用板块知识点兜底，减少「综合」假阴
-    let okKnow = '综合';
-    if (isCombined) okKnow = best;
-    else if (q._knowHint && names.has(q._knowHint)) okKnow = q._knowHint;
-    q.knowledge = okKnow;
-    q._knowScore = bestScore;
+    q.knowledge = label;
+    q._knowScore = fineKws.length ? fineBs : coarse.bs;
   });
 }
 
@@ -1503,7 +1565,9 @@ function autoKnowledge(questions, subjectId) {
    例：「文言文阅读」「名篇名句默写」「语言文字运用」「写作」直接对应语文某知识点；
    而缺乏明确性的「阅读I/II/诗句阅读」不做默认，交给关键词匹配。 */
 const SECTION_KNOW_HINT = [
-  [/文言文|古诗文/, '文言文阅读'],
+  [/古代诗歌阅读|诗歌阅读|诗歌鉴赏/, '古诗词鉴赏'],
+  [/现代文阅读|论述类文本|文学类文本|实用类文本/, '现代文阅读'],
+  [/文言文阅读|古诗文/, '文言文阅读'],
   [/默写|名句/, '名句默写'],
   [/语言文字运用/, '语言文字运用'],
   [/写作|作文/, '作文'],
@@ -1518,7 +1582,7 @@ const TYPE_KEY = /(选择题|单项选择|多项选择|填空题|解答题|综�
 /* 去零碎行预处理：pdf.js 会把同属一行的文字按 Y 坐标差拆成多行（如「（本题」「6」「分）…」）。
    这里把不以“结构锚点”开头（题号/选项/小题/本章节/材料组题干）的续行粘回上一行，
    让「（本题 6 分）」「一、单选题（共 48 分）」等重新并成完整一行，便于后续规则识别。 */
-const REFLOW_ANCHOR = /^(?:[一二三四五六七八九十百]{1,3}\s*[、．]|\d{1,3}\s*[、．]|\d{1,3}\.\s*(?!\d)|[A-H]\s*[\.、．）):：:]|[（(]\s*(?:本题|本组|本大题)|[（(]\s*\d+\s*[）)]|答案第)/;
+const REFLOW_ANCHOR = /^(?:[一二三四五六七八九十百]{1,3}\s*[、．]|\d{1,3}\s*[、．]|\d{1,3}\.\s*(?!\d)|[A-H]\s*[\.、．）):：:]|（[一二三四五六七八九十]{1,4}）|[（(]\s*(?:本题|本组|本大题)|[（(]\s*\d+\s*[）)]|答案第)/;
 function reflowPaperText(text) {
   const out = [];
   for (const raw of String(text).split(/\r?\n/)) {
