@@ -3,7 +3,7 @@
 'use strict';
 
 /* 构建版本：前端展示用，便于判断是否缓存了旧脚本 */
-const APP_VERSION = '20260922k';
+const APP_VERSION = '20260922m';
 
 /* ---------- 科目字典 ---------- */
 const SUBJECTS = [
@@ -1371,12 +1371,12 @@ const KNOWLEDGE_MAP = {
   physics: [
     { name: '力与牛顿运动定律', kws: ['牛顿', '受力分析', '摩擦力', '弹力', '重力', '合力', '滑动摩擦', '平衡力', '作用力'] },
     { name: '直线运动', kws: ['匀变速', '自由落体', '自由下落', '初速度', '末速度', '匀加速', '位移', '速度', '平均速度', 'v-t图', 'x-t图', '路程'] },
-    { name: '曲线运动与抛体', kws: ['平抛', '抛体', '曲线运动', '圆周运动', '向心加速度', '向心力', '离心'] },
-    { name: '万有引力与航天', kws: ['万有引力', '卫星', '绕地球', '近地', '航天', '宇宙速度', '开普勒', '天体', '轨道', '行星运动', '地球同步'] },
+    { name: '曲线运动与抛体', kws: ['平抛', '抛体', '曲线运动', '圆周运动', '向心加速度', '向心力', '离心', '圆弧', '轨道', '向心'] },
+    { name: '万有引力与航天', kws: ['万有引力', '卫星', '绕地球', '近地', '航天', '宇宙速度', '开普勒', '天体', '轨道', '行星运动', '地球同步', '发射速度'] },
     { name: '功和能', kws: ['功', '功率', '动能', '动能定理', '势能', '机械能', '机械能守恒', '能量守恒', '功与能'] },
     { name: '动量', kws: ['动量', '冲量', '碰撞', '动量守恒', '反冲'] },
     { name: '静电场', kws: ['电场', '电势', '场强', '电场线', '等势面', '库仑', '电容', '静电', '电荷'] },
-    { name: '恒定电流', kws: ['欧姆定律', '电阻', '电流', '电压', '电功率', '闭合电路', '内阻', '串联', '并联', '焦耳'] },
+    { name: '恒定电流', kws: ['欧姆定律', '电阻', '电流', '电压', '电功率', '闭合电路', '内阻', '串联', '并联', '焦耳', '电动势', '伏安法', '干电池'] },
     { name: '磁场', kws: ['磁场', '磁感应强度', '安培力', '洛伦兹力', '洛伦兹', '磁感线', '通电导线'] },
     { name: '电磁感应', kws: ['电磁感应', '楞次定律', '法拉第', '感应电动势', '感应电流', '导体棒', '自感'] },
     { name: '交变电流', kws: ['交变电流', '交流', '变压器', '正弦式', '有效值', '瞬时值', '周期'] },
@@ -1432,7 +1432,7 @@ const KNOWLEDGE_MAP = {
     { name: '地球运动', kws: ['自转', '公转', '昼夜', '正午太阳高度', '太阳高度', '日影', '四季', '五带', '太阳直射', '极昼', '极夜', '昼夜长短', '黄赤交角', '地转偏向'] },
     { name: '大气环境', kws: ['大气', '气压', '风', '锋面', '气旋', '反气旋', '季风', '气候', '降水', '海陆热力', '盛行风', '水汽', '比湿', '逆温', '逆湿', '低压槽', '高压脊', '对流'] },
     { name: '水循环与洋流', kws: ['水循环', '洋流', '河流', '湖泊', '冰川', '径流', '补给', '汛期', '水文', '水量', '含沙量', '支流'] },
-    { name: '地质作用与地貌', kws: ['地质', '板块', '内力作用', '外力作用', '侵蚀', '沉积', '地质构造', '褶皱', '断层', '地貌', '山地', '河谷', '堆积', '搬运', '风化', '岩层', '化石', '地壳', '地幔', '地核', '岩石圈', '地质年代', '剖面'] },
+    { name: '地质作用与地貌', kws: ['地质', '板块', '内力作用', '外力作用', '侵蚀', '沉积', '地质构造', '褶皱', '断层', '地貌', '地形', '山地', '河谷', '堆积', '搬运', '风化', '岩层', '化石', '地壳', '地幔', '地核', '岩石圈', '地质年代', '剖面'] },
     { name: '自然资源与自然灾害', kws: ['自然资源', '能源', '矿产', '台风', '地震', '滑坡', '泥石流', '旱涝', '灾害'] },
     { name: '人口与城市', kws: ['人口', '城市化', '聚落', '城市', '人口迁移', '老龄化', '区位选择'] },
     { name: '农业地域', kws: ['农业', '种植业', '畜牧业', '水稻', '小麦', '商品粮', '农业地域', '灌溉'] },
@@ -1527,7 +1527,7 @@ function autoKnowledge(questions, subjectId) {
       const maximal = cell.filter((c, i) => !cell.some((d, j) => j !== i && d.k.length > c.k.length && d.k.includes(c.k)));
       let sc = 0;
       for (const { k, inParts } of maximal) sc += Math.min(k.length, 5) * (kwFreq[k] > 1 ? 0.5 : 1) * (inParts ? 1 : 0.6);
-      const finalScore = sc * (maximal.length >= 2 ? 1 : 0.55);
+      const finalScore = sc * (maximal.length >= 2 ? 1 : 0.78);
       if (finalScore > bs) { bs = finalScore; best = name; }
     }
     return { best, bs };
@@ -1571,6 +1571,14 @@ const SECTION_KNOW_HINT = [
   [/默写|名句/, '名句默写'],
   [/语言文字运用/, '语言文字运用'],
   [/写作|作文/, '作文'],
+  // 英语等外语：板块题型本身就是知识点大类，且这些大类名不会与中文板块名冲突
+  // （对非英语科目，hint 会被 autoKnowledge 中 names.has(_knowHint) 过滤掉，安全）
+  [/听力|listening|dialogue|conversation/, '听力'],
+  [/完形填空|cloze/, '完形填空'],
+  [/语法填空|grammar/, '语法填空'],
+  [/短文改错|改错|proofreading/, '短文改错'],
+  [/书面表达|写作|作文|应用文|短文写作|letter|writing/, '书面表达'],
+  [/阅读理解|阅读下列|passage|reading|七选五|任务型阅读/, '阅读理解'],
 ];
 const knowHintOf = (header) => {
   const h = String(header || '');
@@ -1582,7 +1590,7 @@ const TYPE_KEY = /(选择题|单项选择|多项选择|填空题|解答题|综�
 /* 去零碎行预处理：pdf.js 会把同属一行的文字按 Y 坐标差拆成多行（如「（本题」「6」「分）…」）。
    这里把不以“结构锚点”开头（题号/选项/小题/本章节/材料组题干）的续行粘回上一行，
    让「（本题 6 分）」「一、单选题（共 48 分）」等重新并成完整一行，便于后续规则识别。 */
-const REFLOW_ANCHOR = /^(?:[一二三四五六七八九十百]{1,3}\s*[、．]|\d{1,3}\s*[、．]|\d{1,3}\.\s*(?!\d)|[A-H]\s*[\.、．）):：:]|（[一二三四五六七八九十]{1,4}）|[（(]\s*(?:本题|本组|本大题)|[（(]\s*\d+\s*[）)]|答案第|(?:下列|请|将|结合|根据|简答|概括|分析|翻译|补写|仿照|仿写|写作|简述|阅读|梳理|默写|题目|本文|上文).*(?:[（(][^）)]*\d+(?:\.\d+)?[^）)]*\s*分))/;
+const REFLOW_ANCHOR = /^(?:[一二三四五六七八九十百]{1,3}\s*[、．]|第[一二三四五六七八九十百\d]+(?:部分|节|大题)|\d{1,3}\s*[、．]|\d{1,3}\.\s*(?!\d)|[A-H]\s*[\.、．）):：:]|（[一二三四五六七八九十]{1,4}）|[（(]\s*(?:本题|本组|本大题)|[（(]\s*\d+\s*[）)]|答案第|(?:下列|请|将|结合|根据|简答|概括|分析|翻译|补写|仿照|仿写|写作|简述|阅读|梳理|默写|题目|本文|上文).*(?:[（(][^）)]*\d+(?:\.\d+)?[^）)]*\s*分))/;
 function reflowPaperText(text) {
   const out = [];
   for (const raw of String(text).split(/\r?\n/)) {
@@ -1622,8 +1630,14 @@ function parsePaper(text, expectCount) {
 
   const isSection = (l) => {
     if (isQuestionStart(l) || isOptionLine(l)) return false;
+    // 明确的大板块分段头（"第X部分/大题/卷"），即使无题型关键词与分值也要当板块边界处理，
+    // 否则会被当成正文丢弃，导致前一板块的知识点/分值状态残留到后一板块
+    if (/第[一二三四五六七八九十百\dIVCX]+(?:部分|大题|卷)/.test(l)) return true;
     // 放宽：含题型关键词即视为大题标题；长行若能带分值说明也一并识别，避免被并进首题导致分值误取
-    return TYPE_KEY.test(l) && (l.length < 70 || /[（(]?\s*\d+(?:\.\d+)?\s*分|[0-9]+分/.test(l));
+    if (TYPE_KEY.test(l) && (l.length < 70 || /[（(]?\s*\d+(?:\.\d+)?\s*分|[0-9]+分/.test(l))) return true;
+    // 纯分值指令行（如英语"第一节（共5小题，每小题1.5分）"、缩写题头"一、选择（每题3分）"）：
+    // 不带题型关键词也要作为“本题型分值与题数”背景触发，供其后续无分小题套用均分
+    return l.length < 45 && /(?:小题|每题|每道|每小问|题)\s*(\d+(?:\.\d+)?)\s*分|每空\s*(\d+(?:\.\d+)?)\s*分/.test(l);
   };
   const isQuestionStart = (l) =>
     /^\d{1,3}\s*[、．]/.test(l) ||               // 中文顿号/全角点："1、""3．"
@@ -1642,14 +1656,17 @@ function parsePaper(text, expectCount) {
     /^(姓名|准考证号|学校|班级|座位号|注意事项|应试须知|考生须知|监考|正确填涂|当为|一律|考试结束|交卷|密封线|不要折叠|请在各题|禁止)[：:  ]/.test(l) || /^语文(科目)?$/.test(l) ||
     /本试题共\d+分|考试时长|请在答题卡|作答在答题卡|涂写在答题卡|填涂在答题卡|答案写在本试卷上|本试卷|试卷满分|第\d+页（共\d+页）|保密|选择题作答用[0-9A-Za-z]|条形码|超出答题|偏出答题|一律无效|考试结束后|一并交回|并收回/.test(l);
   // 扫描 OCR 的乱码行：无意义英文串、重复短片段、纯符号行——不进题目判定，直接丢弃
+  // 注意：支持英语等外语试卷，纯英文行不再一律丢弃，仅在“无空格、超长、无中文”时视为乱码。
+  // 重复段判别需剔除下划线/括号等填空占位符（“___”极易被误判为重复段），且重复段须占该行主体。
   const isGarbage = (l) => {
     const cn = (l.match(/[\u4e00-\u9fa5]/g) || []).length;
     const letters = (l.match(/[A-Za-z]/g) || []).length;
     const digits = (l.match(/\d/g) || []).length;
     if (cn === 0 && digits === 0 && letters === 0 && l.length >= 2) return true;   // 纯符号/空白
-    if (cn === 0 && letters >= 3) return true;                                      // 无中文的英文幻觉（MERRIE）
-    const core = l.replace(/[\s，。、！？；：“”"'\-—…·]/g, '');
-    if (core.length >= 6 && /(.{1,4})\1{2,}/.test(core)) return true;               // 重复短片段（把①把①把①）
+    if (cn === 0 && letters >= 4 && !/ [A-Za-z]{2,}/.test(l) && l.length >= 8) return true; // 无空格长英文幻觉
+    const c2 = l.replace(/[^0-9a-zA-Z\u4e00-\u9fa5]/g, '');  // 只留字母/数字/汉字，剔除占位与标点
+    const mr = c2.length >= 6 ? /(.{1,4})\1{2,}/.exec(c2) : null;
+    if (mr && mr[0].length * 2 >= c2.length) return true;    // 重复片段占全行主体才算乱码
     return false;
   };
   const finalize = (pb) => {
@@ -1683,8 +1700,13 @@ function parsePaper(text, expectCount) {
       finalize(pending); pending = null;
       // 结算上一个材料组（若有）
       if (activeGroup >= 0) { distributeGroup(activeGroup); activeGroup = -1; }
-      curType = (l.match(TYPE_KEY) || [''])[0];
-      const hint = knowHintOf(l); if (hint) curKnow = hint;
+      const _t = l.match(TYPE_KEY);
+      if (_t) curType = _t[0];            // 小题分值指令行无题型关键词时不覆盖已定题型
+      const hint = knowHintOf(l);
+      if (hint) curKnow = hint;
+      // 新大板块边界（携带题型关键词，或"第X部分"这类明确分段）却无明确知识点 → 清空继承，
+      // 避免上一板块知识点串题；纯分值续行（如听力内"第一节…每小题X分"）不在此列，保留父板块知识点
+      else if (_t || /^第[一二三四五六七八九十百\d]+(?:部分|大题|卷)/.test(l)) curKnow = '';
       const pe = l.match(/(?:小题|每题|每道|每小问|题)\s*(\d+(?:\.\d+)?)\s*分/);
       const pk = l.match(/每空\s*(\d+(?:\.\d+)?)\s*分/);
       if (pe || pk) {
@@ -1715,12 +1737,18 @@ function parsePaper(text, expectCount) {
     if (/^[\(（]\s*\d+\s*[\)）]/.test(l) && pending) {
       if (pending.parts.length < 14) pending.parts.push(l);
       pending.subMark = pending.subMark || [];
-      // 取小问号之后紧跟的分值，兼容 "（1）8分"、"（1）本题6分" 等写法
-      const qn = l.match(/^\s*[\(（]\s*(\d+)\s*[\)）]/);
+      // 取小问号之后紧跟的分值，兼容 "（1）8分"、"（1）本题6分" 等写法；
+      // 一行可能含多个小问（如 "（1）…4分  （2）…4分"），以每个（N）为边界把分值归到最近的号
+      const qn = l.match(/^\s*[\(（]\s*(\d+)\s*[）]/);
       const rest = qn ? l.slice(qn[0].length) : l;
-      for (const sm of rest.matchAll(/(\d+(?:\.\d+)?)\s*分/g)) {
-        const v = parseFloat(sm[1]);
-        if (v > 0 && v <= 100) pending.subMark.push({ no: qn ? qn[1] : pending.subMark.length + 1, mark: v });
+      const subRe = /[（(]\s*(\d+)\s*[）)]|(\d+(?:\.\d+)?)\s*分/g;
+      let curNo = qn ? qn[1] : (pending.subMark.length + 1);
+      for (const m of rest.matchAll(subRe)) {
+        if (m[1] !== undefined) { curNo = m[1]; }           // 遇到新的小问号
+        else if (m[2] !== undefined) {                       // 分值
+          const v = parseFloat(m[2]);
+          if (v > 0 && v <= 100) pending.subMark.push({ no: String(curNo), mark: v });
+        }
       }
       continue;
     }
