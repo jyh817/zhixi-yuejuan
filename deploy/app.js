@@ -1500,8 +1500,8 @@ function parsePaper(text, expectCount) {
   const isOptionLine = (l) => /^[ABCD][\s\.、．\)）:：]/.test(l);
   // 卷首说明/注意事项/考生信息/页脚等非试题噪音，跳过以免被当成分值或题干
   const isNoise = (l) =>
-    /^(姓名|准考证号|注意事项|监考|正确填涂|当为|一律)[：: ]/.test(l) || /^语文$/.test(l) ||
-    /本试题共\d+分|考试时长|答题卡|答案写在本试卷上[^\d]{0,6}无效|第\d+页（共\d+页）|保密★|选择题作答用2B铅笔/.test(l);
+    /^(姓名|准考证号|学校|班级|座位号|注意事项|应试须知|考生须知|监考|正确填涂|当为|一律|考试结束|交卷|密封线|不要折叠|请在各题|禁止)[：:  ]/.test(l) || /^语文(科目)?$/.test(l) ||
+    /本试题共\d+分|考试时长|答题卡|答案写在本试卷上|本试卷|试卷满分|第\d+页（共\d+页）|保密|选择题作答用[0-9A-Za-z]|条形码|超出答题|偏出答题|一律无效|考试结束后|一并交回|并收回/.test(l);
   const finalize = (pb) => {
     if (!pb) return;
     // 综合题：若带小问分值，父题分值优先取题面明确总分数，否则取小问分值合计
@@ -1602,17 +1602,27 @@ function detectPoints(text) {
   if (m) return parseFloat(m[1]);
   // 2) 括号分值，剔除汇总类（"（本题共5小题，19分）""（共19分）"等大题总分不作单题分）
   const clean = [];
+  const SECT_WORDS = /(阅读|阅读理解|古代诗文|古诗文|文言文|古代诗歌|诗歌|名句|默写|语言文字|文学|现代文|论述类|实用类|听力|完形|填空|翻译)/;
   for (const o of stem.matchAll(/[（(]([^（）()]*?)(\d+(?:\.\d+)?)\s*分\s*[）)]/g)) {
-    const pre = o[1] || '';                       // 括号内、分值数字前的整段文字
-    if (/(共|合计|总计|组内|本组|该组|总分|小题|每题|每空|每点)/.test(pre)) continue;
-    clean.push(parseFloat(o[2]));
+    const pre = (o[1] || '').trim();              // 括号内、分值数字前的整段文字
+    const v = parseFloat(o[2]);
+    if (/(共|合计|总计|组内|本组|该组|总分|小题|每题|每空|每点)/.test(pre)) continue;   // 汇总口径
+    // 括号内是板块名且很短（"（古代诗歌阅读9分）"），或括号前紧邻板块名（"古代诗歌阅读(9分)"）→ 判为大题总分
+    const preBefore = stem.slice(Math.max(0, o.index - 6), o.index);
+    if (!/(作文|写作)/.test(pre + preBefore) &&
+        (SECT_WORDS.test(preBefore) || (pre.length <= 6 && SECT_WORDS.test(pre)))) continue;
+    // 单题分不应大到异常（>30 仅作文/本题明确分值可信），拦截板块总分泄漏
+    if (v >= 30 && !/(作文|写作|本题|该题|本小问)/.test(pre)) continue;
+    clean.push(v);
   }
   if (clean.length) return clean[0];
-  // 3) 唯一的"X分"（其前是 共/合计/总计/总分/小题 等汇总口径则不取，避免把大题总分当单题分）
+  // 3) 唯一的"X分"：作文/写作分值可信；其余若其前紧邻板块名或汇总口径(阅读/文言文/诗歌/共/合计…)，是大题总分，不取
   const all = [...stem.matchAll(/(\d+(?:\.\d+)?)\s*分/g)];
   if (all.length === 1) {
     const pre = stem.slice(Math.max(0, all[0].index - 8), all[0].index);
-    if (!/(共|合计|总计|总分|小题|本组|该组|每题|每空|每点)/.test(pre)) return parseFloat(all[0][1]);
+    if (/(作文|写作)/.test(pre)) return parseFloat(all[0][1]);
+    if (/(共|合计|总计|总分|小题|本组|该组|每组|每题|每空|每点|阅读|文言文|古诗文|诗歌|古代诗歌|名句|默写|语言文字|文学|现代文|论述|实用|听力|完形|填空|翻译)/.test(pre)) return 0;
+    return parseFloat(all[0][1]);
   }
   return 0;
 }
