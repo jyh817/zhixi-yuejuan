@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>智析阅卷 · 试卷分析系统</title>
   <meta name="description" content="中小学试卷分析工具：逐题评价、整体评价、Excel 导出">
-  <link rel="stylesheet" href="style.css?v=20260921k">
+  <link rel="stylesheet" href="style.css?v=20260922a">
   <!-- 核心库 -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -178,7 +178,7 @@
               <div class="upload-box">
                 <span class="upload-label">上传试卷（推荐，识别题号与分值）</span>
                 <input type="file" id="smartPaper" accept=".pdf,.docx,.doc">
-                <div class="file-meta" id="smartPaperMeta">支持文字版 PDF / Word(.docx)；扫描版 PDF 将自动启用 OCR（较慢）</div>
+                <div class="file-meta" id="smartPaperMeta">仅支持文字版 PDF / Word(.docx)；扫描版 PDF 无法识别，请勿上传</div>
               </div>
               <div class="upload-box">
                 <span class="upload-label">上传参考答案（可选，辅助校准分值）</span>
@@ -366,6 +366,6 @@
 
   <div class="toast-wrap" id="toastWrap"></div>
 
-  <script src="app.js?v=20260921k"></script>
+  <script src="app.js?v=20260922a"></script>
 </body>
 </html>

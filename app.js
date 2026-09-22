@@ -1056,7 +1056,7 @@ const PDF_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.w
 function openSmart() {
   fillSubjects($('#smartSubject'), '');
   $('#smartName').value = '';
-  $('#smartPaperMeta').textContent = '支持文字版 PDF / Word(.docx)；扫描版 PDF 将自动启用 OCR（较慢）';
+  $('#smartPaperMeta').textContent = '仅支持文字版 PDF / Word(.docx)；扫描版 PDF 无法识别，请勿上传';
   $('#smartAnswerMeta').textContent = '可选';
   $('#smartPaper').value = ''; $('#smartAnswer').value = '';
   SMART.paperFile = null; SMART.answerFile = null; SMART.questions = [];
@@ -1090,12 +1090,10 @@ $('#btnSmartRun').addEventListener('click', async () => {
   try {
     prog.textContent = '正在提取试卷文字…';
     let paperText = await extractText(SMART.paperFile);
-    SMART.scanned = paperText.replace(/\s/g, '').length < 60;
-    if (SMART.scanned) {
-      prog.textContent = '未检测到文字层，判定为扫描件，正在启用 OCR（需联网、较慢）…';
-      paperText = await ocrPdf(await SMART.paperFile.arrayBuffer(), (m) => prog.textContent = m);
+    SMART.scanned = false;
+    if (paperText.replace(/\s/g, '').length < 60) {
+      throw new Error('该试卷是扫描版 PDF（无文字层）。本系统已停止支持扫描件识别，请改为上传文字版 PDF 或 Word(.docx)。');
     }
-    if (paperText.replace(/\s/g, '').length < 40) throw new Error('未能识别到有效文字，疑似扫描质量过低或文件异常');
     let questions = parsePaper(paperText);
     // 答案辅助校准分值
     if (SMART.answerFile) {
@@ -1108,7 +1106,7 @@ $('#btnSmartRun').addEventListener('click', async () => {
     const withP = questions.filter(q => q.fullMark > 0).length;
     prog.classList.add('hidden');
     $('#smartSummary').innerHTML = `识别完成：共 <b>${questions.length}</b> 道小题，其中 <b>${withP}</b> 道已识别到分值，
-      <b>${questions.length - withP}</b> 道需在下一步补分值。` + (SMART.scanned ? '（本次为 OCR 扫描识别，请务必核对题号与分值）' : '');
+      <b>${questions.length - withP}</b> 道需在下一步补分值。`;
     $('#btnSmartToTpl').disabled = questions.length === 0;
   } catch (err) {
     prog.textContent = '';
@@ -1775,9 +1773,7 @@ async function wizParse() {
       prog.textContent = '正在提取试卷文字…';
       paperText = await extractText(WIZ.paperFile);
       if (paperText.replace(/\s/g, '').length < 60) {
-        prog.textContent = '试卷无文字层，判定为扫描件，启用 OCR（较慢）…';
-        try { paperText = await ocrPdf(await WIZ.paperFile.arrayBuffer(), m => prog.textContent = m); }
-        catch (e) { throw new Error('OCR 失败：' + e.message); }
+        throw new Error('试卷是扫描版 PDF（无文字层）。本系统已停止支持扫描件识别，请改为上传文字版 PDF 或 Word(.docx)。');
       }
     }
     // 2. 答案文字提取
