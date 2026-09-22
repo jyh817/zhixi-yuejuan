@@ -2,6 +2,9 @@
 /* 纯前端实现：localStorage 存业务数据，IndexedDB 存试卷归档文件 */
 'use strict';
 
+/* 构建版本：前端展示用，便于判断是否缓存了旧脚本 */
+const APP_VERSION = '20260922e';
+
 /* ---------- 科目字典 ---------- */
 const SUBJECTS = [
   { id: 'chinese', name: '语文' },
@@ -1805,8 +1808,9 @@ async function wizParse() {
       prog.textContent = '正在导入成绩 Excel…';
       const buf = await WIZ.scoreFile.arrayBuffer();
       const wb = XLSX.read(buf, { type: 'array' });
-      const n = wizImportScores(wb);
-      if (!n) throw new Error('成绩 Excel 中未识别到学生数据，请确认含姓名/学号与各小题得分列');
+      const imp = wizImportScores(wb);
+      if (!imp.ok) throw new Error('成绩 Excel 未识别到学生数据。' + (imp.diag || ''));
+      WIZ.students = imp.students;
     }
     // 汇总
     const withP = WIZ.questions.filter(q => q.fullMark > 0).length;
@@ -1838,26 +1842,36 @@ function wizImportScores(wb) {
     return s ? s.name : '';
   })();
   const all = wb.SheetNames || [];
+  const nameSheets = [], scoreSheets = [];
   let best = null;
   for (let i = 0; i < all.length; i++) {
     const res = importScoreSheet(wb.Sheets[all[i]]);
-    if (!res || res.count === 0) continue;
+    if (!res) continue;
+    if (res.hasName) nameSheets.push(all[i]);
+    if (res.count === 0) continue;
+    if (res.direct > 0) scoreSheets.push(all[i]);
     const score = res.direct * 10000
       + (subjName && all[i].includes(subjName) ? 1000 : 0)
       + (all.length - i);
-    if (!best || score > best.score) best = { res, score };
+    if (!best || score > best.score) best = { res, score, sn: all[i] };
   }
-  if (!best) return 0;
-  WIZ.students = best.res.students;
-  return best.res.count;
+  if (!best) {
+    let diag;
+    if (!all.length) diag = '该文件里没有可用的工作表(sheet)。';
+    else if (!nameSheets.length) diag = `该文件有 ${all.length} 个 sheet，但表头里都找不到"姓名/学号"，请确认上传的是「成绩明细」表。`;
+    else if (!scoreSheets.length) diag = `找到姓名列表头（${nameSheets.join('、')}），但没有匹配到任何小题得分列——请确认分数是"每小题一列"而非只给总分。`;
+    else diag = `已尝试 ${all.length} 个 sheet（${all.join('、')}），均未能对到题目列。`;
+    return { ok: false, diag };
+  }
+  return { ok: true, count: best.res.count, students: best.res.students, diag: `使用工作表「${best.sn}」。` };
 }
 function importScoreSheet(ws) {
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-  if (rows.length < 2) return { students: [], count: 0 };
+  if (rows.length < 2) return { students: [], count: 0, direct: 0, hasName: false };
   const lastNum = (s) => { const m = String(s).match(/(\d+)/g); return m ? +m[m.length - 1] : null; };
   // 定位"姓名/学生"标识所在表头行（多级合并表头以此为基准）
   const nameRi = rows.findIndex(r => r.some(c => /姓名|学生|name/i.test(String(c))));
-  if (nameRi < 0) return { students: [], count: 0 };
+  if (nameRi < 0) return { students: [], count: 0, direct: 0, hasName: false };
   const nameCol = rows[nameRi].findIndex(c => /姓名|学生|name/i.test(String(c)));
   // 表头可能有多层（如 语文→客观题→单选1 三层合并、标题行/二维码行等），
   // 数据起始行 = 姓名所在列首次出现真实内容的那一行
@@ -1882,7 +1896,7 @@ function importScoreSheet(ws) {
   }
   const nameIdx = headers.findIndex(h => /姓名|学生|name/i.test(h));
   const noIdx = headers.findIndex(h => /(学号|考号|\bid\b)/i.test(h) && !/姓名/.test(h));
-  if (nameIdx < 0) return { students: [], count: 0 };
+  if (nameIdx < 0) return { students: [], count: 0, direct: 0, hasName: false };
   const minIdx = Math.max(nameIdx, noIdx) + 1; // 小题列从学生标识列之后开始找
   // 题目 → Excel 列：按题号末尾数字匹配（"单选1" ↔ 题1，"Q3" ↔ 题3）
   const qHeadIdx = WIZ.questions.map(q => {
@@ -1905,7 +1919,7 @@ function importScoreSheet(ws) {
     }
   }
   // 至少要有题目列才算与试卷对应；完全没有则视为不相关 sheet，交给上层换别的 sheet 试
-  if (direct === 0) return { students: [], count: 0, direct: 0 };
+  if (direct === 0) return { students: [], count: 0, direct: 0, hasName: true };
   const students = [];
   for (let r = dataStart; r < rows.length; r++) {
     const row = rows[r];
@@ -1921,7 +1935,7 @@ function importScoreSheet(ws) {
     });
     students.push({ id: uid(), name: name || '学生' + (r + 1), no, scores });
   }
-  return { students, count: students.length, direct };
+  return { students, count: students.length, direct, hasName: true };
 }
 
 /* --- 核对页渲染 --- */
@@ -2170,6 +2184,8 @@ function initWizard() {
  *  初始化
  * ========================================================== */
 function initAll() {
+  // 展示运行版本号，便于判断浏览器是否还缓存着旧脚本
+  document.getElementById('appVer') && (document.getElementById('appVer').textContent = APP_VERSION);
   bindWizardUI();
   // 科目变化时联动刷新模板下拉
   $('#examSubject').addEventListener('change', () => {
