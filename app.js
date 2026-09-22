@@ -1830,22 +1830,26 @@ async function wizParse() {
 }
 
 function wizImportScores(wb) {
-  // 成绩表可能按科目分多个 sheet：优先选择与当前考试科目同名的 sheet，
-  // 科目未选或对不上时，按 sheet 顺序依次尝试，取第一个能识别出学生的
+  // 成绩表可能按科目分多个 sheet：自动选"题目列匹配最准"的那张
+  // （科目同名优先，再按直接命中题目名的数量排序），不依赖下拉框选对科目
   const subjName = (() => {
     const id = WIZ._subjectId || (($('#impSubject')) && $('#impSubject').value);
     const s = SUBJECTS.find(x => x.id === id);
     return s ? s.name : '';
   })();
   const all = wb.SheetNames || [];
-  const ordered = subjName
-    ? [...all.filter(sn => sn.includes(subjName)), ...all.filter(sn => !sn.includes(subjName))]
-    : all;
-  for (const sn of ordered) {
-    const res = importScoreSheet(wb.Sheets[sn]);
-    if (res && res.count > 0) { WIZ.students = res.students; return res.count; }
+  let best = null;
+  for (let i = 0; i < all.length; i++) {
+    const res = importScoreSheet(wb.Sheets[all[i]]);
+    if (!res || res.count === 0) continue;
+    const score = res.direct * 10000
+      + (subjName && all[i].includes(subjName) ? 1000 : 0)
+      + (all.length - i);
+    if (!best || score > best.score) best = { res, score };
   }
-  return 0;
+  if (!best) return 0;
+  WIZ.students = best.res.students;
+  return best.res.count;
 }
 function importScoreSheet(ws) {
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
@@ -1886,16 +1890,22 @@ function importScoreSheet(ws) {
     if (n == null) return -1;
     return headers.findIndex((h, i) => i >= minIdx && lastNum(h) === n);
   });
-  // 兜底：匹配数不足且有足够的"数字结尾"列时，按位置顺序对齐
-  const matchedCount = qHeadIdx.filter(i => i >= 0).length;
-  if (matchedCount < WIZ.questions.length) {
+  // 直接按题号数字命中表头的题目数（用于跨科目 sheet 自动挑选正确的一张）
+  const direct = qHeadIdx.filter(i => i >= 0).length;
+  // 兜底：仍未命中的题目，按顺序补到剩余"数字结尾"列上，尽量多带入分值（同一列不重复占用）
+  if (direct < WIZ.questions.length) {
     const numCols = headers.map((h, i) => ({ i, n: lastNum(h) }))
       .filter(x => x.i >= minIdx && x.n !== null).map(x => x.i);
-    if (numCols.length >= WIZ.questions.length) {
-      for (let k = 0; k < WIZ.questions.length; k++) if (qHeadIdx[k] < 0) qHeadIdx[k] = numCols[k];
+    const used = new Set(qHeadIdx.filter(i => i >= 0));
+    let ci = 0;
+    for (let k = 0; k < WIZ.questions.length && ci < numCols.length; k++) {
+      if (qHeadIdx[k] >= 0) continue;
+      while (ci < numCols.length && used.has(numCols[ci])) ci++;
+      if (ci < numCols.length) { qHeadIdx[k] = numCols[ci]; used.add(numCols[ci]); ci++; }
     }
   }
-  if (qHeadIdx.every(i => i < 0)) return { students: [], count: 0 };
+  // 至少要有题目列才算与试卷对应；完全没有则视为不相关 sheet，交给上层换别的 sheet 试
+  if (direct === 0) return { students: [], count: 0, direct: 0 };
   const students = [];
   for (let r = dataStart; r < rows.length; r++) {
     const row = rows[r];
@@ -1911,7 +1921,7 @@ function importScoreSheet(ws) {
     });
     students.push({ id: uid(), name: name || '学生' + (r + 1), no, scores });
   }
-  return { students, count: students.length };
+  return { students, count: students.length, direct };
 }
 
 /* --- 核对页渲染 --- */
