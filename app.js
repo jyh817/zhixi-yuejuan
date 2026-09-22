@@ -1837,18 +1837,27 @@ function wizImportScores(wb) {
   // 定位"姓名/学生"标识所在表头行（多级合并表头以此为基准）
   const nameRi = rows.findIndex(r => r.some(c => /姓名|学生|name/i.test(String(c))));
   if (nameRi < 0) return 0;
-  // 判断是否多级表头：姓名行下方紧邻是否出现"单选N/题N/QN"这类小题标题
-  const nextR = rows[nameRi + 1] || [];
-  const multiTier = nextR.some(c =>
-    /^(单选|多选|选择|判断|填空|简答|解答|问答|计算|第)?\s*\d+\s*(题|点|分)?$/i.test(String(c).trim()) ||
-    /^[qQpP]\d+$/i.test(String(c).trim()));
-  const dataStart = nameRi + (multiTier ? 2 : 1);
-  // 合并表头：优先取小题行，缺省回退到姓名行
-  const ncol = Math.max(rows[nameRi].length, multiTier ? nextR.length : 0);
+  const nameCol = rows[nameRi].findIndex(c => /姓名|学生|name/i.test(String(c)));
+  // 表头可能有多层（如 语文→客观题→单选1 三层合并、标题行/二维码行等），
+  // 数据起始行 = 姓名所在列首次出现真实内容的那一行
+  let dataStart = nameRi + 1;
+  while (dataStart < rows.length) {
+    const cell = rows[dataStart] && rows[dataStart][nameCol];
+    if (cell !== '' && cell != null) break;
+    dataStart++;
+  }
+  if (dataStart >= rows.length) dataStart = nameRi + 1;
+  // 把 姓名行 到 数据行 之前的每一层表头合成一行：自下而上取每列【最后一个非空】表头，
+  // 这样下层的"单选1"能覆盖上层的"客观题/语文"，多层合并表头也能逐列正确归一到最具体的小题名
+  const headerRange = dataStart - nameRi;
+  const ncol = Math.max(...rows.slice(nameRi, dataStart).map(r => (r ? r.length : 0)));
   const headers = [];
   for (let c = 0; c < ncol; c++) {
-    let v = multiTier ? String(nextR[c] || '').trim() : '';
-    if (!v) v = String(rows[nameRi][c] || '').trim();
+    let v = '';
+    for (let rr = nameRi; rr < dataStart; rr++) {
+      const cell = rows[rr] && rows[rr][c];
+      if (cell !== '' && cell != null) v = String(cell).trim();
+    }
     headers[c] = v;
   }
   const nameIdx = headers.findIndex(h => /姓名|学生|name/i.test(h));
