@@ -1502,6 +1502,17 @@ function parsePaper(text, expectCount) {
   const isNoise = (l) =>
     /^(姓名|准考证号|学校|班级|座位号|注意事项|应试须知|考生须知|监考|正确填涂|当为|一律|考试结束|交卷|密封线|不要折叠|请在各题|禁止)[：:  ]/.test(l) || /^语文(科目)?$/.test(l) ||
     /本试题共\d+分|考试时长|答题卡|答案写在本试卷上|本试卷|试卷满分|第\d+页（共\d+页）|保密|选择题作答用[0-9A-Za-z]|条形码|超出答题|偏出答题|一律无效|考试结束后|一并交回|并收回/.test(l);
+  // 扫描 OCR 的乱码行：无意义英文串、重复短片段、纯符号行——不进题目判定，直接丢弃
+  const isGarbage = (l) => {
+    const cn = (l.match(/[\u4e00-\u9fa5]/g) || []).length;
+    const letters = (l.match(/[A-Za-z]/g) || []).length;
+    const digits = (l.match(/\d/g) || []).length;
+    if (cn === 0 && digits === 0 && letters === 0 && l.length >= 2) return true;   // 纯符号/空白
+    if (cn === 0 && letters >= 3) return true;                                      // 无中文的英文幻觉（MERRIE）
+    const core = l.replace(/[\s，。、！？；：“”"'\-—…·]/g, '');
+    if (core.length >= 6 && /(.{1,4})\1{2,}/.test(core)) return true;               // 重复短片段（把①把①把①）
+    return false;
+  };
   const finalize = (pb) => {
     if (!pb) return;
     // 综合题：若带小问分值，父题分值优先取题面明确总分数，否则取小问分值合计
@@ -1527,6 +1538,7 @@ function parsePaper(text, expectCount) {
 
   for (const l of lines) {
     if (isNoise(l)) continue;                        // 跳过卷首说明/页脚
+    if (isGarbage(l)) continue;                      // 跳过 OCR 乱码行
     // 大题标题（含题型关键词 + 分值说明，支持"共X小题，每小题Y分" 或 "每小题Y分……共X题" 及"每空Y分"）
     if (isSection(l)) {
       finalize(pending); pending = null;
