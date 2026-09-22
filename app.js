@@ -3,7 +3,7 @@
 'use strict';
 
 /* 构建版本：前端展示用，便于判断是否缓存了旧脚本 */
-const APP_VERSION = '20260922e';
+const APP_VERSION = '20260922f';
 
 /* ---------- 科目字典 ---------- */
 const SUBJECTS = [
@@ -1863,7 +1863,19 @@ function wizImportScores(wb) {
     else diag = `已尝试 ${all.length} 个 sheet（${all.join('、')}），均未能对到题目列。`;
     return { ok: false, diag };
   }
-  return { ok: true, count: best.res.count, students: best.res.students, diag: `使用工作表「${best.sn}」。` };
+  const use = best.res;
+  // 无试卷/答案题目时，用成绩表表头自动推断出的小题
+  if (use.auto && use.qList && use.qList.length) {
+    WIZ.questions = use.qList.map((q, i) => ({
+      qid: q.qid || ('Q' + (i + 1)), type: q.type || '未分类',
+      knowledge: q.knowledge || '综合', fullMark: q.fullMark || 0, sort: i + 1,
+    }));
+  }
+  return {
+    ok: true, count: use.count, students: use.students,
+    diag: `使用工作表「${best.sn}」，识别学生 ${use.count} 人。` +
+      (use.auto ? ` 已按表头自动生成 ${use.qList.length} 道小题，请在下一步核对分值。` : ''),
+  };
 }
 function importScoreSheet(ws) {
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
@@ -1898,6 +1910,55 @@ function importScoreSheet(ws) {
   const noIdx = headers.findIndex(h => /(学号|考号|\bid\b)/i.test(h) && !/姓名/.test(h));
   if (nameIdx < 0) return { students: [], count: 0, direct: 0, hasName: false };
   const minIdx = Math.max(nameIdx, noIdx) + 1; // 小题列从学生标识列之后开始找
+  // 构建学生成绩行（idxArr[i] 对应第 个小题列的列号，qids[i] 是该小题题号）
+  const buildStudents = (idxArr, qids) => {
+    const out = [];
+    for (let r = dataStart; r < rows.length; r++) {
+      const row = rows[r];
+      if (!row) continue;
+      const name = nameIdx >= 0 ? String(row[nameIdx]).trim() : '';
+      const no = noIdx >= 0 ? String(row[noIdx]).trim() : '';
+      if (!name && !no) continue;
+      const scores = {};
+      idxArr.forEach((idx, k) => {
+        const v = idx >= 0 ? row[idx] : 0;
+        scores[qids[k]] = v === '' || v == null ? 0 : Math.max(0, toNum(v) || 0);
+      });
+      out.push({ id: uid(), name: name || '学生' + (r + 1), no, scores });
+    }
+    return out;
+  };
+
+  // —— 没有试卷/答案题目时：直接从成绩表表头自动推断小题 ——
+  if (WIZ.questions.length === 0) {
+    const isAgg = (h) => /(总分|合计|总计|班名次|校名次|名次|排名|得分率|平均|客观|主观)$/.test(h);
+    const cand = [];
+    for (let c = minIdx; c < headers.length; c++) {
+      const h = headers[c] || '';
+      if (!h || isAgg(h)) continue;
+      if (lastNum(h) !== null || /(单选|多选|选择|判断|填空|简答|解答|问答|计算|作|阅读|默写|翻译)$/.test(h)) cand.push(c);
+    }
+    if (!cand.length) return { students: [], count: 0, direct: 0, hasName: true };
+    const qList = [];
+    for (const c of cand) {
+      let mx = 0;
+      for (let r = dataStart; r < rows.length; r++) {
+        const v = rows[r] ? parseFloat(rows[r][c]) : NaN;
+        if (!isNaN(v) && v > mx) mx = v;
+      }
+      const h = headers[c];
+      let type = '主观题';
+      if (/多选/.test(h)) type = '多选题';
+      else if (/单选|选择/.test(h)) type = '选择题';
+      else if (/判断/.test(h)) type = '判断题';
+      else if (/填空/.test(h)) type = '填空题';
+      else if (/作/.test(h)) type = '写作';
+      qList.push({ qid: h, type, knowledge: '综合', fullMark: mx });
+    }
+    const students = buildStudents(cand.slice(), qList.map(q => q.qid));
+    return { students, count: students.length, qList, direct: qList.length, hasName: true, auto: true };
+  }
+
   // 题目 → Excel 列：按题号末尾数字匹配（"单选1" ↔ 题1，"Q3" ↔ 题3）
   const qHeadIdx = WIZ.questions.map(q => {
     const n = lastNum(q.qid);
@@ -1920,21 +1981,7 @@ function importScoreSheet(ws) {
   }
   // 至少要有题目列才算与试卷对应；完全没有则视为不相关 sheet，交给上层换别的 sheet 试
   if (direct === 0) return { students: [], count: 0, direct: 0, hasName: true };
-  const students = [];
-  for (let r = dataStart; r < rows.length; r++) {
-    const row = rows[r];
-    if (!row) continue;
-    const name = nameIdx >= 0 ? String(row[nameIdx]).trim() : '';
-    const no = noIdx >= 0 ? String(row[noIdx]).trim() : '';
-    if (!name && !no) continue;
-    const scores = {};
-    WIZ.questions.forEach((q, k) => {
-      const idx = qHeadIdx[k];
-      const v = idx >= 0 ? row[idx] : 0;
-      scores[q.qid] = v === '' || v == null ? 0 : Math.max(0, toNum(v) || 0);
-    });
-    students.push({ id: uid(), name: name || '学生' + (r + 1), no, scores });
-  }
+  const students = buildStudents(qHeadIdx, WIZ.questions.map(q => q.qid));
   return { students, count: students.length, direct, hasName: true };
 }
 
