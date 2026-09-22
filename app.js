@@ -3,7 +3,7 @@
 'use strict';
 
 /* 构建版本：前端展示用，便于判断是否缓存了旧脚本 */
-const APP_VERSION = '20260922f';
+const APP_VERSION = '20260922g';
 
 /* ---------- 科目字典 ---------- */
 const SUBJECTS = [
@@ -1138,13 +1138,66 @@ function openTplModalWithQ(name, subjectId, questions) {
 }
 
 /* --- 文字提取 --- */
+
+// docx 兜底提取：不依赖外部 mammoth CDN，直接解析 ZIP 中 word/document.xml 抽文字
+async function extractDocxXml(u8) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  let eocd = -1;
+  for (let i = u8.length - 22; i >= 0; i--) {           // End Of Central Directory
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) return null;
+  const cdOffset = dv.getUint32(eocd + 16, true);
+  const cdCount = dv.getUint16(eocd + 10, true);
+  let target = null, off = cdOffset;
+  for (let n = 0; n < cdCount; n++) {
+    if (dv.getUint32(off, true) !== 0x02014b50) break;
+    const method = dv.getUint16(off + 10, true);
+    const csize = dv.getUint32(off + 20, true);
+    const nlen = dv.getUint16(off + 28, true);
+    const elen = dv.getUint16(off + 30, true);
+    const clen = dv.getUint16(off + 32, true);
+    const lho = dv.getUint32(off + 42, true);
+    let name = '';
+    for (let k = 0; k < nlen; k++) name += String.fromCharCode(u8[off + 46 + k]);
+    const dataOff = lho + 30 + dv.getUint16(lho + 26, true) + dv.getUint16(lho + 28, true);
+    if (name === 'word/document.xml') {
+      target = { method, csize, off: dataOff };
+      break;
+    }
+    off += 46 + nlen + elen + clen;
+  }
+  if (!target) return null;
+  const comp = u8.subarray(target.off, target.off + target.csize);
+  if (target.method === 0) return new TextDecoder('utf-8').decode(comp);
+  // deflate-raw 压缩：用浏览器原生 DecompressionStream（无需第三方库）
+  const stream = new Blob([comp]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  const decBuf = await new Response(stream).arrayBuffer();
+  return new TextDecoder('utf-8').decode(decBuf);
+}
+function textFromWml(xml) {
+  const t = xml.replace(/<w:p[^>]*>/g, '\n').replace(/<w:tab[^>]*>/g, '\t').replace(/<w:br[^>]*>/g, '\n').replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+  return t.replace(/\u00a0/g, ' ');
+}
 async function extractText(file) {
   const name = (file.name || '').toLowerCase();
   const buf = await file.arrayBuffer();
   if (name.endsWith('.docx') || /wordprocessing/.test(file.type)) {
-    const res = await mammoth.convertToHtml({ arrayBuffer: buf });
-    const d = document.createElement('div'); d.innerHTML = res.value;
-    return (d.innerText || d.textContent || '').replace(/\u00a0/g, ' ');
+    let txt = '';
+    let html = '';
+    if (typeof mammoth !== 'undefined') {
+      try { const res = await mammoth.convertToHtml({ arrayBuffer: buf }); html = (res && res.value) || ''; } catch (e) { html = ''; }
+    }
+    if (html && typeof document !== 'undefined') {
+      const d = document.createElement('div'); d.innerHTML = html;
+      txt = (d.innerText || d.textContent || '').replace(/\u00a0/g, ' ');
+    }
+    // mammoth 缺失或提取为空 → 用内置 ZIP 解析兜底（不依赖外部网络）
+    if (!txt.replace(/\s/g, '').length && typeof DecompressionStream !== 'undefined') {
+      try { const xml = await extractDocxXml(buf); if (xml) txt = textFromWml(xml); } catch (e) { /* 保持原样 */ }
+    }
+    return txt || html;
   }
   if (name.endsWith('.doc') || /msword/.test(file.type)) {
     const s = decodeDocText(new Uint8Array(buf));
